@@ -7,7 +7,7 @@ from PIL import Image
 import time
 import pyrealsense2 as rs
 
-interpreter = tf.lite.Interpreter(model_path="./model/yolov4-int8.tflite")
+interpreter = tf.lite.Interpreter(model_path="./model/yolov4-tiny-fp16.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
@@ -22,8 +22,7 @@ depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
 print(depth_scale)
 time.sleep(1)
 cv2.namedWindow('Detect', cv2.WINDOW_AUTOSIZE)
-cv2.namedWindow('Depth', cv2.WINDOW_AUTOSIZE)
-
+cv2.namedWindow('ROI', cv2.WINDOW_AUTOSIZE)
 def filter_boxes(box_xywh, scores, score_threshold=0.4, input_shape = tf.constant([416,416])):
     scores_max = tf.math.reduce_max(scores, axis=-1)
 
@@ -53,7 +52,8 @@ def filter_boxes(box_xywh, scores, score_threshold=0.4, input_shape = tf.constan
 
 names = {0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'}
 
-def draw_bbox(image, bboxes, classes=names, show_label=True):
+def draw_bbox(image, white, bboxes, classes=names, show_label=True):
+    im = image
     num_classes = len(classes)
     image_h, image_w, _ = image.shape
     hsv_tuples = [(1.0 * x / num_classes, 1., 1.) for x in range(num_classes)]
@@ -82,14 +82,28 @@ def draw_bbox(image, bboxes, classes=names, show_label=True):
         # print(class_ind)
         bbox_color = colors[class_ind]
         bbox_thick = int(0.6 * (image_h + image_w) / 600)
-        c1, c2 = (coor[1], coor[0]), (coor[3], coor[2])
+        c1, c2 = (int(coor[1]), int(coor[0])), (int(coor[3]), int(coor[2]))
+        white[c1[1]:c2[1],c1[0]:c2[0],:] = im[c1[1]:c2[1],c1[0]:c2[0],:]
         # pred_class.append(classes[class_ind])
         # pred_score.append(score)
 
+
+        # pred_class.append(classes[class_ind])
+        # pred_score.append(score)
+        # cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), bbox_color, bbox_thick)
+        # if show_label:
+        #     bbox_mess = '%s: %.2f' % (classes[class_ind], score)
+        #     t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
+        #     c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
+        #     cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c3[0]), int(c3[1])), bbox_color, -1) #filled
+
+        #     cv2.putText(image, bbox_mess, (int(c1[0]), int(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,
+        #                 fontScale, (0, 0, 0), bbox_thick // 2, lineType=cv2.LINE_AA)
         if (classes[class_ind] == 'RF' or classes[class_ind] == 'LF'):
             pred_class.append(classes[class_ind])
             pred_score.append(score)
             cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), bbox_color, bbox_thick)
+            cv2.circle(image, (int((c1[0]+c2[0])/2),int((c1[1]+c2[1])/2)), 5, bbox_color, bbox_thick)
             if show_label:
                 bbox_mess = '%s: %.2f' % (classes[class_ind], score)
                 t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
@@ -98,7 +112,7 @@ def draw_bbox(image, bboxes, classes=names, show_label=True):
 
                 cv2.putText(image, bbox_mess, (int(c1[0]), int(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,
                             fontScale, (0, 0, 0), bbox_thick // 2, lineType=cv2.LINE_AA)
-    return image,pred_class,pred_score
+    return white,image,pred_class,pred_score
 
 
 while True:
@@ -113,6 +127,8 @@ while True:
     image_data = cv2.resize(color_image, (416,416))
     image_data = image_data / 255.
     image_data = image_data[np.newaxis, ...].astype(np.float32)
+    white = np.zeros([480,848,3],dtype=np.uint8)
+    white.fill(255)
     interpreter.set_tensor(input_details[0]['index'], image_data)
     interpreter.invoke()
     pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
@@ -122,16 +138,17 @@ while True:
         boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
         scores=tf.reshape(
             pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
-        max_output_size_per_class=10,
-        max_total_size=50,
-        iou_threshold=0.45,
-        score_threshold=0.6
+            max_output_size_per_class=10,
+            max_total_size=50,
+            iou_threshold=0.45,
+            score_threshold=0.6
     )
     pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
-    image,classes,scores = draw_bbox(color_im, pred_bbox)
-    print(classes)
-    print(scores)
-    cv2.imshow('Depth feed', image)
+    white_im, image,classes,scores = draw_bbox(color_im, white, pred_bbox)
+    # print(classes)
+    # print(scores)
+    cv2.imshow('Detect', image)
+    cv2.imshow('ROI', white_im)
     key = cv2.waitKey(1)
     # Press esc or 'q' to close the image window
     if key & 0xFF == ord('q') or key == 27:
