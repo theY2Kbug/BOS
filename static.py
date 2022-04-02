@@ -6,7 +6,7 @@ import colorsys
 from PIL import Image
 import time
 
-interpreter = tf.lite.Interpreter(model_path="./model/yolov4.tflite")
+interpreter = tf.lite.Interpreter(model_path="./model/yolov4-tiny-832-bw-fp16.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
@@ -14,7 +14,7 @@ time.sleep(1)
 cv2.namedWindow('Detect', cv2.WINDOW_AUTOSIZE)
 # cv2.namedWindow('Depth', cv2.WINDOW_AUTOSIZE)
 
-def filter_boxes(box_xywh, scores, score_threshold=0.4, input_shape = tf.constant([416,416])):
+def filter_boxes(box_xywh, scores, score_threshold=0.4, input_shape = tf.constant([832,832])):
     scores_max = tf.math.reduce_max(scores, axis=-1)
 
     mask = scores_max >= score_threshold
@@ -75,32 +75,32 @@ def draw_bbox(image, bboxes, classes=names, show_label=True):
         c1, c2 = (coor[1], coor[0]), (coor[3], coor[2])
         # pred_class.append(classes[class_ind])
         # pred_score.append(score)
+        pred_class.append(classes[class_ind])
+        pred_score.append(score)
+        cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), bbox_color, bbox_thick)
+        if show_label:
+            bbox_mess = '%s: %.2f' % (classes[class_ind], score)
+            t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
+            c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
+            cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c3[0]), int(c3[1])), bbox_color, -1) #filled
 
-        if (classes[class_ind] == 'RF' or classes[class_ind] == 'LF'):
-            pred_class.append(classes[class_ind])
-            pred_score.append(score)
-            cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), bbox_color, bbox_thick)
-            if show_label:
-                bbox_mess = '%s: %.2f' % (classes[class_ind], score)
-                t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
-                c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
-                cv2.rectangle(image, (int(c1[0]), int(c1[1])), (int(c3[0]), int(c3[1])), bbox_color, -1) #filled
-
-                cv2.putText(image, bbox_mess, (int(c1[0]), int(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,
-                            fontScale, (0, 0, 0), bbox_thick // 2, lineType=cv2.LINE_AA)
+            cv2.putText(image, bbox_mess, (int(c1[0]), int(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale, (0, 0, 0), bbox_thick // 2, lineType=cv2.LINE_AA)
     return image,pred_class,pred_score
 
 
 
-color_im = cv2.imread('./images/100-35.jpg')
-color_image = cv2.cvtColor(color_im, cv2.COLOR_BGR2RGB)
-image_data = cv2.resize(color_image, (416,416))
+color_im = cv2.imread('./images/100-41.jpg')
+color_image = cv2.cvtColor(color_im, cv2.COLOR_BGR2GRAY)
+print(color_image.shape)
+image_data = cv2.resize(color_image, (832,832))
+image_data = np.expand_dims(image_data, axis=2)
 image_data = image_data / 255.
 image_data = image_data[np.newaxis, ...].astype(np.float32)
 interpreter.set_tensor(input_details[0]['index'], image_data)
 interpreter.invoke()
 pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
-boxes, pred_conf = filter_boxes(pred[0], pred[1], score_threshold=0.25, input_shape=tf.constant([416, 416]))
+boxes, pred_conf = filter_boxes(pred[0], pred[1], score_threshold=0.25, input_shape=tf.constant([832, 832]))
 
 boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
     boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
@@ -109,7 +109,7 @@ boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression
     max_output_size_per_class=10,
     max_total_size=50,
     iou_threshold=0.45,
-    score_threshold=0.5
+    score_threshold=0.15
 )
 pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
 image,classes,scores = draw_bbox(color_im, pred_bbox)
