@@ -30,9 +30,6 @@ def nothing(x):
 cv2.namedWindow('stream',cv2.WINDOW_AUTOSIZE)
 cv2.namedWindow('ROI',cv2.WINDOW_AUTOSIZE)
 cv2.createTrackbar('accuracy','stream',50,100,nothing)
-cv2.createTrackbar("block-size", "ROI", 2, 50, nothing)
-cv2.createTrackbar("constant", "ROI", 0, 255, nothing)
-# cv2.namedWindow('ROI', cv2.WINDOW_AUTOSIZE)
 
 
 def filter_boxes(box_xywh, scores, score_threshold=0.4, input_shape = tf.constant([416,416])):
@@ -64,17 +61,9 @@ def filter_boxes(box_xywh, scores, score_threshold=0.4, input_shape = tf.constan
 
 names = {0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'}
 
-def draw_bbox(thresh_image, contour, white1, white2, bboxes, classes=names, show_label=True):
+def draw_bbox(thresh_image, white1, white2, bboxes, classes=names, show_label=True):
     num_classes = len(classes)
     image_h, image_w, _ = thresh_image.shape
-    h, w, _ = contour.shape
-    # hsv_tuples = [(1.0 * x / num_classes, 1., 1.) for x in range(num_classes)]
-    # colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    # colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
-
-    # random.seed(0)
-    # random.shuffle(colors)
-    # random.seed(None)
 
     out_boxes, out_scores, out_classes, num_boxes = bboxes
     
@@ -88,17 +77,12 @@ def draw_bbox(thresh_image, contour, white1, white2, bboxes, classes=names, show
         coor[1] = int(coor[1] * image_w)
         coor[3] = int(coor[3] * image_w)
 
-        # fontScale = 0.5
-        # score = out_scores[0][i]
-        # class_ind = int(out_classes[0][i])
-        # print(class_ind)
-        # bbox_color = colors[class_ind]
-        # bbox_thick = int(0.6 * (image_h + image_w) / 600)
         c1, c2 = (int(coor[1]), int(coor[0])), (int(coor[3]), int(coor[2]))
         white1[c1[1]:c2[1],c1[0]:c2[0]] = thresh_image[c1[1]:c2[1],c1[0]:c2[0]]
-        white2[c1[1]:c2[1],c1[0]:c2[0]] = contour[c1[1]:c2[1],c1[0]:c2[0]]
+        contours, hierarchy = cv2.findContours(image=white1, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+        cv2.drawContours(image=white2, contours=contours, contourIdx=-1, color=(25, 25, 112), thickness=2, lineType=cv2.LINE_AA)
         
-    return np.hstack((white1,white2)),pred_class,pred_score
+    return np.hstack((white1,(255-white2))),pred_class,pred_score
 
 
 while True:
@@ -108,56 +92,21 @@ while True:
     depth_frame = aligned_frame.get_depth_frame()
     color_frame = aligned_frame.get_color_frame()
     color_im = np.asanyarray(color_frame.get_data())
-    # b,g,r = cv2.split(color_im)
-    # equ_b = cv2.equalizeHist(b)
-    # equ_g = cv2.equalizeHist(g)
-    # equ_r = cv2.equalizeHist(r)
-    # equ = cv2.merge((equ_b, equ_g, equ_r))
-    # depth_image = np.asanyarray(depth_frame.get_data())
     filtered_depth = spatial.process(depth_frame)
     depth_image = np.asanyarray(filtered_depth.get_data())
-    # al = cv2.getTrackbarPos("alpha", "Controls")
-    # final = cv2.convertScaleAbs(depth_image, alpha=(al/65535.0))
-    # kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    # final = cv2.filter2D(final, -1, kernel)
-    # ret3,th3 = cv2.threshold(final,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     color_image = cv2.cvtColor(color_im, cv2.COLOR_BGR2RGB)
-    # blur = cv2.GaussianBlur(color_image,(5,5),0)
-    gray_image = cv2.cvtColor(color_im, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(color_image,(5,5),0)
+    gray_image = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY)
     gray_image = np.expand_dims(gray_image,2)
     lab = cv2.cvtColor(color_image, cv2.COLOR_BGR2LAB)
-    # tv, thresh = cv2.threshold(lab[:,:,0], 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    # l,a,b = cv2.split(lab)
-    # thresh = cv2.inRange(l, 90, 255)
-    # gray_image = cv2.equalizeHist(gray_image)
-    # twoDimage = color_im.reshape((-1,3))
-    # twoDimage = np.float32(twoDimage)
-    # criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    # k = 2
-    # attempts=10
-    # ret,label,center=cv2.kmeans(twoDimage,k,None,criteria,attempts,cv2.KMEANS_PP_CENTERS)
-    # center = np.uint8(center)
-    # res = center[label.flatten()]
-    # result_image = res.reshape((color_im.shape))
-    bs = (int(cv2.getTrackbarPos('block-size','ROI'))*2) - 1
-    c = int(cv2.getTrackbarPos('constant','ROI'))
-    # thresh_mean = cv2.adaptiveThreshold(gray_image,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,bs,c)
-    # thresh_gauss = cv2.adaptiveThreshold(gray_image,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,bs,c)
-    ret3,thresh = cv2.threshold(lab[:,:,0],0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    # ret2,th3 = cv2.threshold(th2,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    
-    # thresh_gauss = np.expand_dims(thresh_gauss,2)
-    # contours, hierarchy = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+    ret3,thresh = cv2.threshold(gray_image,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     thresh = np.expand_dims(thresh,2)
-    # img = np.zeros([480,848,3],dtype=np.uint8)
-    # cv2.drawContours(image=img, contours=contours, contourIdx=-1, color=(21, 255, 165), thickness=2, lineType=cv2.LINE_AA)
-    
     image_data = cv2.resize(color_image, (416,416))
     image_data = image_data / 255.
     image_data = image_data[np.newaxis, ...].astype(np.float32)
-    white1 = np.zeros([480,848,3],dtype=np.uint8)
+    white1 = np.zeros([480,848,1],dtype=np.uint8)
     white1.fill(255)
-    white2 = np.zeros([480,848,3],dtype=np.uint8)
+    white2 = np.zeros([480,848,1],dtype=np.uint8)
     white2.fill(255)
     interpreter.set_tensor(input_details[0]['index'], image_data)
     interpreter.invoke()
@@ -177,26 +126,11 @@ while True:
     )
     pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
     
-    contours, hierarchy = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
-    # thresh = np.expand_dims(thresh,2)
-    # thresh = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-    img = np.zeros([480,848,3],dtype=np.uint8)
-    img.fill(255)
-    cv2.drawContours(image=img, contours=contours, contourIdx=-1, color=(210, 23, 165), thickness=2, lineType=cv2.LINE_AA)
-    # white_im_mean, classes,scores = draw_bbox(thresh_mean, white, pred_bbox)
-    # white_im_gauss, classes,scores = draw_bbox(thresh_gauss, white, pred_bbox)
-    # white_im = np.hstack((white_im_mean,white_im_gauss))
-    white_im, classes, scores = draw_bbox(thresh, img, white1, white2, pred_bbox)
     
-    # white_im = np.hstack((white_im_contour,white_im_thresh))
-    # img.fill(255)
-    # white_im = 255 - white_im
-    # print(classes)
-    # print(scores)
+    white_im, classes, scores = draw_bbox(thresh, white1, white2, pred_bbox)
     cv2.imshow('ROI', white_im)
     cv2.imshow('stream',color_im)
     key = cv2.waitKey(1)
-    # Press esc or 'q' to close the image window
     if key & 0xFF == ord('q') or key == 27:
         cv2.destroyAllWindows()
         break
