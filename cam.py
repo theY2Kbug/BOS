@@ -144,8 +144,9 @@ while True:
             score_threshold=0.4
     )
     pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
+    print(pred_bbox)
     white_im, image,classes,scores = draw_bbox(color_im, white, pred_bbox)
-    # print(classes)
+    print(classes)
     # print(scores)
     cv2.imshow('Detect', image)
     cv2.imshow('ROI', white_im)
