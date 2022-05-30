@@ -101,7 +101,7 @@ dependencies:
     - jupyter-core==4.9.2
     - nest-asyncio==1.5.5
     - numpy==1.19.5
-    - opencv-contrib-python==4.5.5.64
+    - opencv-contrib-python-headless==4.5.5.64
     - parso==0.7.1
     - pexpect==4.8.0
     - pickleshare==0.7.5
@@ -112,6 +112,9 @@ dependencies:
     - pygments==2.12.0
     - pyrealsense2==2.50.0.3812
     - python-dateutil==2.8.2
+    - pyqt5==5.15.6
+    - pyqt5-qt5==5.15.2
+    - pyqt5-sip==12.10.1
     - pyzmq==22.3.0
     - scipy==1.4.1
     - tensorboard==2.2.2
@@ -120,4 +123,5 @@ dependencies:
     - tornado==6.1
     - traitlets==4.3.3
     - wcwidth==0.2.5
+    - tflite-runtime==2.8.0
 prefix: /home/kathir/miniconda3/envs/bos
