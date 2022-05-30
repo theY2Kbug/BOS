@@ -1,3 +1,4 @@
 model
 test_files
 ui_files
+__pycache__
