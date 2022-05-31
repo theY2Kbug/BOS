@@ -9,7 +9,7 @@ The base of support (BoS) refers to the area beneath an object or person that in
   <p>Credit: Sheik Abdul Khadir A.M.K., PhysioPedia</p>
 </div>
 
-# To use this repository
+## To use this repository
 
 Anaconda or any of its variants must be installed, intel realsense d435 camera is required.
 
@@ -20,7 +20,7 @@ conda activate bos
 python -u mainWindow.py
 ```
 
-# At a glance
+## At a glance
 <p>The purple shaded region is the BoS.</p>
 
 https://user-images.githubusercontent.com/76219678/171118181-6b6c630d-e533-4645-9d4c-ff53b03fa567.mp4
