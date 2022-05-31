@@ -41,7 +41,7 @@ out = 1
 contour_settings = 500
 iou_threshold = 45
 decimation_filter_mag = 2
-gaussian_blur = 3
+gaussian_blur = 5
 hsv_enabled = True
 regular_enabled = False
 opening_kernel_size = 3
@@ -166,11 +166,11 @@ class mainWindow:
         self.settings_ui.decimation_label.setText(str(decimation_filter_mag))
         self.settings_ui.decimation_threshold.valueChanged.connect(self.setDecimationThreshold)
 
-        self.settings_ui.gaussian_blur.setSliderPosition(gaussian_blur)
+        self.settings_ui.gaussian_blur.setSliderPosition(2)
         self.settings_ui.gaussian_blur_label.setText(str(gaussian_blur))
         self.settings_ui.gaussian_blur.valueChanged.connect(self.setGaussian)
 
-        self.settings_ui.opening_kernel.setSliderPosition(opening_kernel_size)
+        self.settings_ui.opening_kernel.setSliderPosition(1)
         self.settings_ui.opening_kernel_label.setText(str(opening_kernel_size))
         self.settings_ui.opening_kernel.valueChanged.connect(self.setOpening)
 
@@ -192,8 +192,8 @@ class mainWindow:
 
     def setOpening(self,value):
         global opening_kernel_size
-        opening_kernel_size = value
-        self.settings_ui.opening_kernel_label.setText(str(value))
+        opening_kernel_size = int(1 + (2*value))
+        self.settings_ui.opening_kernel_label.setText(str(opening_kernel_size))
     
     def setDecimationThreshold(self,value):
         global decimation_filter_mag
@@ -202,8 +202,8 @@ class mainWindow:
 
     def setGaussian(self,value):
         global gaussian_blur
-        gaussian_blur = value
-        self.settings_ui.gaussian_blur_label.setText(str(value))
+        gaussian_blur = int(1 + (2*value))
+        self.settings_ui.gaussian_blur_label.setText(str(gaussian_blur))
 
     def setIOU(self,value):
         global iou_threshold
@@ -468,6 +468,7 @@ class Camera(QThread):
         global decimation_filter_mag
         global out
         global record
+        global iou_threshold
         self.ThreadActive = True
         
         while self.ThreadActive:
@@ -498,7 +499,7 @@ class Camera(QThread):
                             pred_conf, (shape(pred_conf)[0], -1, shape(pred_conf)[-1])),
                         max_output_size_per_class=5,
                         max_total_size=10,
-                        iou_threshold=0.45,
+                        iou_threshold=(iou_threshold/100),
                         score_threshold=self.detect
                     )
                     pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
@@ -543,7 +544,7 @@ class Camera(QThread):
         colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
         colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
 
-        random.seed(0)
+        random.seed(20)
         random.shuffle(colors)
         random.seed(None)
 
@@ -602,6 +603,8 @@ class Camera(QThread):
 
     def segment(self,color_image,bboxes, classes={0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'},image_h = 480,image_w = 848):
         global contour_settings
+        global opening_kernel_size
+        global gaussian_blur
         num_classes = len(classes)
         white_im = np.full((480, 848, 3),255, dtype = np.uint8)
         hsv_image = cv2.cvtColor(self.color_image, cv2.COLOR_RGB2HSV)
@@ -609,7 +612,7 @@ class Camera(QThread):
         upper = np.array([upperHue, upperSat, upperVal])
         mask = cv2.inRange(hsv_image, lower, upper)
         result = cv2.bitwise_and(color_image, color_image, mask=mask)
-        blur = cv2.GaussianBlur(result,(5,5),0)
+        blur = cv2.GaussianBlur(result,(gaussian_blur,gaussian_blur),0)
         toBeGrayed = np.copy(blur)
         if(self.Regular_flag):
             toBeGrayed = np.copy(self.color_image)        
@@ -631,7 +634,7 @@ class Camera(QThread):
                 c1, c2 = (int(coor[1]), int(coor[0])), (int(coor[3]), int(coor[2]))
                 white_im[c1[1]:c2[1],c1[0]:c2[0],0] = dilate[c1[1]:c2[1],c1[0]:c2[0]]
         
-        kernel = np.ones((3,3),np.uint8)
+        kernel = np.ones((opening_kernel_size,opening_kernel_size),np.uint8)
         open = cv2.morphologyEx(white_im[:,:,0], cv2.MORPH_OPEN, kernel)
         contours, hierarchy = cv2.findContours(image=(255-open), mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
         final_contours = []
@@ -648,10 +651,11 @@ class Camera(QThread):
     def draw_bos(self,contours):
         final_metrics = []
         mask = np.copy(self.color_image)
+        col = (112, 41, 99)
         if(len(contours) == 1):
             bos = np.vstack(contours[0]).squeeze()
-            cv2.fillPoly(mask,[bos],color = (255, 36, 0))
-            bos_img = cv2.addWeighted(mask, 0.3,self.color_image,0.7, 0)
+            cv2.fillPoly(mask,[bos],color = col)
+            bos_img = cv2.addWeighted(mask, 0.4,self.color_image,0.6, 0)
             return(bos_img)
 
         elif(len(contours) == 2):
@@ -681,8 +685,8 @@ class Camera(QThread):
             right_points = right['points'][right['xy_max_idx']:]
             right_points = np.concatenate([right_points, right['points'][0:right['xy_min_idx']]])
             bos = np.concatenate([left_points,right_points])
-            cv2.fillPoly(mask,[bos],color = (255, 36, 0))
-            bos_img = cv2.addWeighted(mask, 0.3,self.color_image,0.7, 0)
+            cv2.fillPoly(mask,[bos],color = col)
+            bos_img = cv2.addWeighted(mask, 0.4,self.color_image,0.6, 0)
             return(bos_img)
 
         else:
