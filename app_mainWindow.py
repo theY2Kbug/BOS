@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'app.ui'
+# Form implementation generated from reading ui file './ui_files/ui_files/app.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.6
 #
@@ -21,7 +21,7 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(MainWindow.sizePolicy().hasHeightForWidth())
         MainWindow.setSizePolicy(sizePolicy)
         MainWindow.setMinimumSize(QtCore.QSize(1080, 640))
-        MainWindow.setMaximumSize(QtCore.QSize(1080, 640))
+        MainWindow.setMaximumSize(QtCore.QSize(1080, 644))
         MainWindow.setStyleSheet("")
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setMinimumSize(QtCore.QSize(1080, 600))
@@ -268,12 +268,12 @@ class Ui_MainWindow(object):
 "    background-color:rgb(186, 189, 182);\n"
 "}")
         self.segment_btn.setObjectName("segment_btn")
-        self.threed_view_btn = QtWidgets.QPushButton(self.last)
-        self.threed_view_btn.setGeometry(QtCore.QRect(870, 180, 181, 51))
+        self.send_data = QtWidgets.QPushButton(self.last)
+        self.send_data.setGeometry(QtCore.QRect(870, 260, 181, 51))
         font = QtGui.QFont()
         font.setPointSize(16)
-        self.threed_view_btn.setFont(font)
-        self.threed_view_btn.setStyleSheet("QPushButton\n"
+        self.send_data.setFont(font)
+        self.send_data.setStyleSheet("QPushButton\n"
 "{\n"
 "    background: #fff;\n"
 "    border:1px solid grey;\n"
@@ -284,9 +284,9 @@ class Ui_MainWindow(object):
 "{\n"
 "    background-color:rgb(186, 189, 182);\n"
 "}")
-        self.threed_view_btn.setObjectName("threed_view_btn")
+        self.send_data.setObjectName("send_data")
         self.bos_btn = QtWidgets.QPushButton(self.last)
-        self.bos_btn.setGeometry(QtCore.QRect(870, 260, 181, 51))
+        self.bos_btn.setGeometry(QtCore.QRect(870, 180, 181, 51))
         font = QtGui.QFont()
         font.setPointSize(16)
         self.bos_btn.setFont(font)
@@ -441,7 +441,7 @@ class Ui_MainWindow(object):
         self.menuBar.addAction(self.menuSettings.menuAction())
 
         self.retranslateUi(MainWindow)
-        self.stackedWidget.setCurrentIndex(0)
+        self.stackedWidget.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -468,7 +468,7 @@ class Ui_MainWindow(object):
         self.rb30.setText(_translate("MainWindow", "30"))
         self.detect_btn.setText(_translate("MainWindow", "Detect"))
         self.segment_btn.setText(_translate("MainWindow", "Segment"))
-        self.threed_view_btn.setText(_translate("MainWindow", "3D View"))
+        self.send_data.setText(_translate("MainWindow", "Send"))
         self.bos_btn.setText(_translate("MainWindow", "BOS"))
         self.stop_record_btn.setText(_translate("MainWindow", "Stop\n"
 "Recording"))

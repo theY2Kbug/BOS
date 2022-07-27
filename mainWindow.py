@@ -15,6 +15,7 @@ import random
 import colorsys
 import webbrowser
 import datetime
+import socket
 
 # from matplotlib.figure import Figure
 # from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -47,6 +48,10 @@ regular_enabled = False
 opening_kernel_size = 3
 depthFlag = False
 
+UDP_IP = "192.168.100.202" #CIT Lab fancy computer on the right side from the entrance when one faces towards the room 192.168.164.170
+UDP_PORT = 5065
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 class mainWindow:
     def __init__(self):
         self.main_win = QMainWindow()
@@ -66,7 +71,7 @@ class mainWindow:
         self.ui.upper_sat.setEnabled(False)
         self.ui.lower_val.setEnabled(False)
         self.ui.upper_val.setEnabled(False)
-        self.ui.threed_view_btn.setEnabled(False)
+        self.ui.send_data.setEnabled(False)
         self.ui.next_btn.clicked.connect(self.showLast)
         self.ui.home_btn.clicked.connect(self.showHome)
         self.ui.setHSV.clicked.connect(self.enableLast)
@@ -80,6 +85,7 @@ class mainWindow:
         self.ui.reset_btn.clicked.connect(self.reset)
         self.ui.segment_btn.clicked.connect(self.segment)
         self.ui.bos_btn.clicked.connect(self.bos)
+        self.ui.send_data.clicked.connect(self.udp_transmission)
         self.ui.detection_accuracy.valueChanged.connect(self.changeDetectionThresh)
         self.ui.start_feed_btn.clicked.connect(self.startCam)
         self.ui.record_screen.toggled.connect(self.setRecord)
@@ -117,7 +123,12 @@ class mainWindow:
         record = 0
 
     def bos(self):
+        self.ui.send_data.setEnabled(True)
         self.thread_1.bos_flag = True
+
+    def udp_transmission(self):
+        self.ui.send_data.setEnabled(False)
+        self.thread_1.send_flag = True
 
     def setFPS15 (self):
         global fps
@@ -255,7 +266,7 @@ class mainWindow:
         self.ui.start_feed_btn.setEnabled(True)
         self.ui.stackedWidget.setCurrentWidget(self.ui.last)
         self.ui.bos_btn.setEnabled(False)
-        self.ui.threed_view_btn.setEnabled(False)
+        self.ui.send_data.setEnabled(False)
         self.ui.stop_record_btn.setEnabled(False)
         self.ui.segment_btn.setEnabled(False)
         self.ui.detection_accuracy.setEnabled(False)
@@ -277,7 +288,7 @@ class mainWindow:
 
     def segment(self):
         self.thread_1.segment_flag = True
-        self.ui.threed_view_btn.setEnabled(False)
+        self.ui.send_data.setEnabled(False)
         self.ui.bos_btn.setEnabled(True)
         
     def changeDetectionThresh(self,value):
@@ -288,9 +299,11 @@ class mainWindow:
         self.thread_1.detect_flag = False
         self.thread_1.segment_flag = False
         self.thread_1.bos_flag = False
+        self.thread_1.send_flag = False
         self.ui.segment_btn.setEnabled(False)
         self.ui.reset_btn.setEnabled(False)
         self.ui.bos_btn.setEnabled(False)
+        self.ui.send_data.setEnabled(False)
         self.ui.detection_accuracy.setEnabled(False)
 
     def showHome(self):
@@ -460,6 +473,7 @@ class Camera(QThread):
         self.detect = 0.4
         self.HSV_flag = hsv_enabled
         self.Regular_flag = regular_enabled
+        self.send_flag = False
         
 
     def run(self):
@@ -649,13 +663,23 @@ class Camera(QThread):
         return white_im,final_contours
 
     def draw_bos(self,contours):
+        global sock
+        global UDP_IP
+        global UDP_PORT
         final_metrics = []
+        area_points = []
         mask = np.copy(self.color_image)
         col = (112, 41, 99)
+        message = "null"
         if(len(contours) == 1):
             bos = np.vstack(contours[0]).squeeze()
             cv2.fillPoly(mask,[bos],color = col)
             bos_img = cv2.addWeighted(mask, 0.4,self.color_image,0.6, 0)
+            message = "narrow"
+            self.main_win.statusBar.clearMessage()
+            self.main_win.statusBar.showMessage(f"BOS TYPE: {message}")
+            if(self.send_flag):
+                sock.sendto((message).encode(), (UDP_IP, UDP_PORT))
             return(bos_img)
 
         elif(len(contours) == 2):
@@ -667,13 +691,27 @@ class Camera(QThread):
                     continue
                 y_min_index = np.argmin(cnt[:,1])
                 xy_minimum = tuple(cnt[y_min_index,:])
+                area_points.append(xy_minimum)
                 # print(xy_minimum)
                 y_max_index = np.argmax(cnt[:,1])
                 xy_maximum = tuple(cnt[y_max_index,:])
+                area_points.append(xy_maximum)
                 # print(xy_max)
                 (x,y),radius = cv2.minEnclosingCircle(cnt)
                 center = (int(x),int(y))
                 final_metrics.append(dict({'center':center , 'xy_min':xy_minimum, 'xy_min_idx':y_min_index, 'xy_max':xy_maximum, 'xy_max_idx':y_max_index, 'points':cnt}))
+            # print(area_points)
+            area = abs((area_points[0][0]*area_points[1][1] - area_points[0][1]*area_points[1][0])
+                        +(area_points[1][0]*area_points[3][1] - area_points[1][1]*area_points[3][0])
+                        +(area_points[3][0]*area_points[2][1] - area_points[3][1]*area_points[2][0])
+                        +(area_points[2][0]*area_points[0][1] - area_points[2][1]*area_points[0][0])) / 2
+            if(area >= 9100):
+                message = "wide"
+            else:
+                message = "narrow"
+            if(self.send_flag):
+                sock.sendto((message).encode(), (UDP_IP, UDP_PORT))
+            
             if(final_metrics[0]['center'][0]<final_metrics[1]['center'][0]):
                 left = final_metrics[0]
                 right = final_metrics[1]
@@ -687,11 +725,15 @@ class Camera(QThread):
             bos = np.concatenate([left_points,right_points])
             cv2.fillPoly(mask,[bos],color = col)
             bos_img = cv2.addWeighted(mask, 0.4,self.color_image,0.6, 0)
+            self.main_win.statusBar.clearMessage()
+            self.main_win.statusBar.showMessage(f"BOS TYPE: {message}")
             return(bos_img)
 
         else:
             self.main_win.statusBar.clearMessage()
-            self.main_win.statusBar.showMessage(f"No BOS! No contours or more than 2 contours detected, repeat segmentation")
+            self.main_win.statusBar.showMessage(f"No BOS! No contours or more than 2 contours detected, repeat segmentation, BOS TYPE:{message}")
+            if(self.send_flag):
+                sock.sendto((message).encode(), (UDP_IP, UDP_PORT))
             return(mask)
 
     def stopThread(self):
