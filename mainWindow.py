@@ -1,3 +1,15 @@
+from tensorflow import shape, reshape, concat, constant, cast, split, boolean_mask, float32
+from app_helpWindow import Ui_HelpWindow
+from app_settingsWindow import Ui_ImageSettingsWindow
+from app_mainWindow import Ui_MainWindow
+import socket
+import datetime
+import webbrowser
+import colorsys
+import random
+from tensorflow import math as math
+from tensorflow import image as image
+import tflite_runtime.interpreter as tflite
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -6,23 +18,10 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-import tflite_runtime.interpreter as tflite
-from tensorflow import shape,reshape,concat,constant,cast,split,boolean_mask,float32
-from tensorflow import image as image
-from tensorflow import math as math
-import random
-import colorsys
-import webbrowser
-import datetime
-import socket
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # from matplotlib.figure import Figure
 # from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
-from app_mainWindow import Ui_MainWindow
-from app_settingsWindow import Ui_ImageSettingsWindow
-from app_helpWindow import Ui_HelpWindow
 
 
 # print(tf.test.is_built_with_cuda())
@@ -48,9 +47,11 @@ regular_enabled = False
 opening_kernel_size = 3
 depthFlag = False
 
-UDP_IP = "192.168.100.202" #CIT Lab fancy computer on the right side from the entrance when one faces towards the room 192.168.164.170
+# CIT Lab fancy computer on the right side from the entrance when one faces towards the room 192.168.164.170
+UDP_IP = "192.168.0.100"
 UDP_PORT = 5065
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 
 class mainWindow:
     def __init__(self):
@@ -60,8 +61,10 @@ class mainWindow:
         self.settings_ui = Ui_ImageSettingsWindow()
         self.ui.stackedWidget.setCurrentWidget(self.ui.home)
 
-        self.ui.actionGithub.triggered.connect(lambda: webbrowser.open('https://github.com/theY2Kbug/BOS#base-of-support-bos'))
-        self.ui.actionSave_Location.triggered.connect(self.openSaveFileLocation)
+        self.ui.actionGithub.triggered.connect(lambda: webbrowser.open(
+            'https://github.com/theY2Kbug/BOS#base-of-support-bos'))
+        self.ui.actionSave_Location.triggered.connect(
+            self.openSaveFileLocation)
         # self.ui.actionHelp.triggered.connect(lambda: self.ui.openHelp())
         self.ui.next_btn.setEnabled(False)
         self.ui.setHSV.setEnabled(False)
@@ -86,7 +89,8 @@ class mainWindow:
         self.ui.segment_btn.clicked.connect(self.segment)
         self.ui.bos_btn.clicked.connect(self.bos)
         self.ui.send_data.clicked.connect(self.udp_transmission)
-        self.ui.detection_accuracy.valueChanged.connect(self.changeDetectionThresh)
+        self.ui.detection_accuracy.valueChanged.connect(
+            self.changeDetectionThresh)
         self.ui.start_feed_btn.clicked.connect(self.startCam)
         self.ui.record_screen.toggled.connect(self.setRecord)
         self.ui.record_screen_btn.setEnabled(False)
@@ -95,7 +99,8 @@ class mainWindow:
         self.ui.record_3d.setEnabled(False)
         self.ui.actionHelp.triggered.connect(lambda: self.openHelp())
         self.ui.actionImage_processing.setEnabled(False)
-        self.ui.actionImage_processing.triggered.connect(lambda: self.openSettings())
+        self.ui.actionImage_processing.triggered.connect(
+            lambda: self.openSettings())
         self.ui.rb15.toggled.connect(self.setFPS15)
         self.ui.rb30.toggled.connect(self.setFPS30)
         self.ui.statusBar.showMessage(f"Set FPS and start feed")
@@ -109,7 +114,7 @@ class mainWindow:
         global saveDir
         self.ui.stop_record_btn.setEnabled(True)
         record = 1
-        global fourcc,out
+        global fourcc, out
         ct = datetime.datetime.now()
         out = cv2.VideoWriter(f"{saveDir}/{ct}.avi", fourcc, 6, (848, 480))
 
@@ -130,11 +135,11 @@ class mainWindow:
         self.ui.send_data.setEnabled(False)
         self.thread_1.send_flag = True
 
-    def setFPS15 (self):
+    def setFPS15(self):
         global fps
         fps = 15
 
-    def setFPS30 (self):
+    def setFPS30(self):
         global fps
         fps = 30
 
@@ -171,11 +176,14 @@ class mainWindow:
 
         self.settings_ui.contour_threshold.setSliderPosition(contour_settings)
         self.settings_ui.contour_label.setText(str(contour_settings))
-        self.settings_ui.contour_threshold.valueChanged.connect(self.setContourThreshold)
+        self.settings_ui.contour_threshold.valueChanged.connect(
+            self.setContourThreshold)
 
-        self.settings_ui.decimation_threshold.setSliderPosition(decimation_filter_mag)
+        self.settings_ui.decimation_threshold.setSliderPosition(
+            decimation_filter_mag)
         self.settings_ui.decimation_label.setText(str(decimation_filter_mag))
-        self.settings_ui.decimation_threshold.valueChanged.connect(self.setDecimationThreshold)
+        self.settings_ui.decimation_threshold.valueChanged.connect(
+            self.setDecimationThreshold)
 
         self.settings_ui.gaussian_blur.setSliderPosition(2)
         self.settings_ui.gaussian_blur_label.setText(str(gaussian_blur))
@@ -188,46 +196,46 @@ class mainWindow:
         self.settings_ui.iou_threshold.setSliderPosition(iou_threshold)
         self.settings_ui.iou_label.setText(str(iou_threshold))
         self.settings_ui.iou_threshold.valueChanged.connect(self.setIOU)
-        
-    def enableDepth(self,enabled):
+
+    def enableDepth(self, enabled):
         global depthFlag
         if(enabled):
             depthFlag = True
         else:
             depthFlag = False
 
-    def setContourThreshold(self,value):
+    def setContourThreshold(self, value):
         global contour_settings
         contour_settings = value
         self.settings_ui.contour_label.setText(str(value))
 
-    def setOpening(self,value):
+    def setOpening(self, value):
         global opening_kernel_size
         opening_kernel_size = int(1 + (2*value))
         self.settings_ui.opening_kernel_label.setText(str(opening_kernel_size))
-    
-    def setDecimationThreshold(self,value):
+
+    def setDecimationThreshold(self, value):
         global decimation_filter_mag
         decimation_filter_mag = value
         self.settings_ui.decimation_label.setText(str(value))
 
-    def setGaussian(self,value):
+    def setGaussian(self, value):
         global gaussian_blur
         gaussian_blur = int(1 + (2*value))
         self.settings_ui.gaussian_blur_label.setText(str(gaussian_blur))
 
-    def setIOU(self,value):
+    def setIOU(self, value):
         global iou_threshold
         iou_threshold = value
         self.settings_ui.iou_label.setText(str(value))
 
-    def setRecord(self,enabled):
+    def setRecord(self, enabled):
         if enabled:
             self.ui.record_screen_btn.setEnabled(True)
         else:
             self.ui.record_screen_btn.setEnabled(False)
 
-    def setHSVflag(self,enabled):
+    def setHSVflag(self, enabled):
         global hsv_enabled
         global regular_enabled
         if enabled:
@@ -236,7 +244,7 @@ class mainWindow:
             self.thread_1.HSV_flag = True
             self.thread_1.Regular_flag = False
 
-    def setRegularflag(self,enabled):
+    def setRegularflag(self, enabled):
         global regular_enabled
         global hsv_enabled
         if enabled:
@@ -249,18 +257,20 @@ class mainWindow:
         self.main_win.show()
 
     def enableLast(self):
-        global lowerHue,upperHue,lowerSat,lowerVal,upperSat,upperVal
+        global lowerHue, upperHue, lowerSat, lowerVal, upperSat, upperVal
         self.ui.next_btn.setEnabled(True)
         self.ui.statusBar.clearMessage()
-        self.ui.statusBar.showMessage(f"Hue: {lowerHue}-{upperHue}; Saturation: {lowerSat} - {upperSat}; Value: {lowerVal} - {upperVal}, Click Next")
+        self.ui.statusBar.showMessage(
+            f"Hue: {lowerHue}-{upperHue}; Saturation: {lowerSat} - {upperSat}; Value: {lowerVal} - {upperVal}, Click Next")
 
     def openSaveFileLocation(self):
         global saveDir
-        file = str(QFileDialog.getExistingDirectory(None, "Select directory to save recording"))
+        file = str(QFileDialog.getExistingDirectory(
+            None, "Select directory to save recording"))
         if(file != ''):
             saveDir = file
         self.ui.statusBar.clearMessage()
-        self.ui.statusBar.showMessage(f"Click Next{saveDir}",2000)
+        self.ui.statusBar.showMessage(f"Click Next{saveDir}", 2000)
 
     def showLast(self):
         self.ui.start_feed_btn.setEnabled(True)
@@ -272,7 +282,7 @@ class mainWindow:
         self.ui.detection_accuracy.setEnabled(False)
         self.ui.reset_btn.setEnabled(False)
         self.thread_0.stopThread()
-        self.thread_1 = Camera(self.ui,width=848,height=480)
+        self.thread_1 = Camera(self.ui, width=848, height=480)
         self.thread_1.start()
         self.thread_1.img_signal.connect(self.ImageUpdateSlot_last)
         self.ui.statusBar.clearMessage()
@@ -290,8 +300,8 @@ class mainWindow:
         self.thread_1.segment_flag = True
         self.ui.send_data.setEnabled(False)
         self.ui.bos_btn.setEnabled(True)
-        
-    def changeDetectionThresh(self,value):
+
+    def changeDetectionThresh(self, value):
         self.thread_1.detect = value/100
         self.ui.det_acc.setText(str(value))
 
@@ -321,53 +331,52 @@ class mainWindow:
         self.ui.fps.setEnabled(True)
         self.ui.statusBar.clearMessage()
         self.ui.statusBar.showMessage(f"Set FPS and start feed")
-        
 
-    def setLowerHue(self,value):
+    def setLowerHue(self, value):
         global lowerHue
         global upperHue
-        if (value<=upperHue):
+        if (value <= upperHue):
             lowerHue = value
             self.ui.lh.setText(str(value))
 
-    def setUpperHue(self,value):
+    def setUpperHue(self, value):
         global lowerHue
         global upperHue
-        if (value>=lowerHue):
+        if (value >= lowerHue):
             upperHue = value
             self.ui.uh.setText(str(value))
 
-    def setLowerSat(self,value):
+    def setLowerSat(self, value):
         global lowerSat
         global upperSat
-        if (value<=upperSat):
+        if (value <= upperSat):
             lowerSat = value
             self.ui.ls.setText(str(value))
 
-    def setUpperSat(self,value):
+    def setUpperSat(self, value):
         global lowerSat
         global upperSat
-        if (value>=lowerSat):
+        if (value >= lowerSat):
             upperSat = value
             self.ui.us.setText(str(value))
 
-    def setLowerVal(self,value):
+    def setLowerVal(self, value):
         global lowerVal
         global upperVal
-        if (value<=upperVal):
+        if (value <= upperVal):
             lowerVal = value
             self.ui.lv.setText(str(value))
 
-    def setUpperVal(self,value):
+    def setUpperVal(self, value):
         global lowerVal
         global upperVal
-        if (value>=lowerVal):
+        if (value >= lowerVal):
             upperVal = value
             self.ui.uv.setText(str(value))
 
     def startCam(self):
         self.ui.setHSV.setEnabled(True)
-        self.thread_0 = HomeCamera(self.ui,width=640,height=480)
+        self.thread_0 = HomeCamera(self.ui, width=640, height=480)
         self.thread_0.start()
         self.thread_0.img_signal.connect(self.ImageUpdateSlot_home)
         self.ui.start_feed_btn.setEnabled(False)
@@ -380,20 +389,21 @@ class mainWindow:
         self.ui.actionImage_processing.setEnabled(True)
         self.ui.fps.setEnabled(False)
         self.ui.statusBar.clearMessage()
-        self.ui.statusBar.showMessage(f"Adjust HSV to segment feet and click set")
+        self.ui.statusBar.showMessage(
+            f"Adjust HSV to segment feet and click set")
 
-    def ImageUpdateSlot_home(self,Image):
+    def ImageUpdateSlot_home(self, Image):
         self.ui.home_video_feed.setPixmap(QPixmap.fromImage(Image))
 
-    def ImageUpdateSlot_last(self,Image):
+    def ImageUpdateSlot_last(self, Image):
         self.ui.video_feed.setPixmap(QPixmap.fromImage(Image))
 
 
 class HomeCamera(QThread):
     img_signal = pyqtSignal(QImage)
 
-    def __init__(self,main_win,parent=None,width=640,height=480):
-        super(HomeCamera,self).__init__(parent)
+    def __init__(self, main_win, parent=None, width=640, height=480):
+        super(HomeCamera, self).__init__(parent)
         self.main_win = main_win
         self.width = width
         self.height = height
@@ -404,8 +414,10 @@ class HomeCamera(QThread):
         self.ThreadActive = True
         try:
             config = rs.config()
-            config.enable_stream(rs.stream.color,self.width, self.height, rs.format.bgr8, fps)
-            config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, fps)
+            config.enable_stream(rs.stream.color, self.width,
+                                 self.height, rs.format.bgr8, fps)
+            config.enable_stream(rs.stream.depth, self.width,
+                                 self.height, rs.format.z16, fps)
             # print(fps)
             self.profile = self.pipeline.start(config)
             while self.ThreadActive:
@@ -422,10 +434,12 @@ class HomeCamera(QThread):
                     lower = np.array([lowerHue, lowerSat, lowerVal])
                     upper = np.array([upperHue, upperSat, upperVal])
                     mask = cv2.inRange(hsv_image, lower, upper)
-                    result = cv2.bitwise_and(color_image, color_image, mask=mask)
-                    converttoQTformat = QImage(result.data,result.shape[1],result.shape[0],QImage.Format_RGB888)
+                    result = cv2.bitwise_and(
+                        color_image, color_image, mask=mask)
+                    converttoQTformat = QImage(
+                        result.data, result.shape[1], result.shape[0], QImage.Format_RGB888)
                     self.img_signal.emit(converttoQTformat)
-            
+
         except Exception as e:
             self.main_win.statusBar.clearMessage()
             self.main_win.statusBar.showMessage(f"Camera not detected, retry")
@@ -446,24 +460,29 @@ class HomeCamera(QThread):
         self.pipeline.stop()
         self.quit()
 
+
 class Camera(QThread):
     img_signal = pyqtSignal(QImage)
-    def __init__(self,main_win,parent=None,width=848,height=480):
+
+    def __init__(self, main_win, parent=None, width=848, height=480):
         global hsv_enabled
         global regular_enabled
-        super(Camera,self).__init__(parent)
+        super(Camera, self).__init__(parent)
         self.main_win = main_win
         self.width = width
         self.height = height
         self.pipeline = rs.pipeline()
         self.config = rs.config()
-        self.config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, fps)
-        self.config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, fps)
+        self.config.enable_stream(
+            rs.stream.color, self.width, self.height, rs.format.bgr8, fps)
+        self.config.enable_stream(
+            rs.stream.depth, self.width, self.height, rs.format.z16, fps)
         self.profile = self.pipeline.start(self.config)
         self.depth_scale = self.profile.get_device().first_depth_sensor().get_depth_scale()
         self.decimation = rs.decimation_filter()
         self.colorizer = rs.colorizer()
-        self.interpreter = tflite.Interpreter(model_path="./model/yolov4-tiny-color-832_fp16.tflite")
+        self.interpreter = tflite.Interpreter(
+            model_path="./model/yolov4-tiny-color-832_fp16.tflite")
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()
         self.output_details = self.interpreter.get_output_details()
@@ -474,7 +493,6 @@ class Camera(QThread):
         self.HSV_flag = hsv_enabled
         self.Regular_flag = regular_enabled
         self.send_flag = False
-        
 
     def run(self):
         global fps
@@ -484,7 +502,7 @@ class Camera(QThread):
         global record
         global iou_threshold
         self.ThreadActive = True
-        
+
         while self.ThreadActive:
             frame = self.pipeline.wait_for_frames()
             align = rs.align(rs.stream.color)
@@ -492,20 +510,26 @@ class Camera(QThread):
             depth_frame = aligned_frame.get_depth_frame()
             color_frame = aligned_frame.get_color_frame()
             color_im = np.asanyarray(color_frame.get_data())
-            self.decimation.set_option(rs.option.filter_magnitude, decimation_filter_mag)
+            self.decimation.set_option(
+                rs.option.filter_magnitude, decimation_filter_mag)
             decimated_depth_frame = self.decimation.process(depth_frame)
-            depth_image_decimated = np.asanyarray(decimated_depth_frame.get_data())
-            colorized_depth = np.asanyarray(self.colorizer.colorize(decimated_depth_frame).get_data())
+            depth_image_decimated = np.asanyarray(
+                decimated_depth_frame.get_data())
+            colorized_depth = np.asanyarray(
+                self.colorizer.colorize(decimated_depth_frame).get_data())
             if(color_im.shape[0]):
                 self.color_image = cv2.cvtColor(color_im, cv2.COLOR_BGR2RGB)
                 if(self.detect_flag):
-                    image_data = cv2.resize(self.color_image, (416,416))
+                    image_data = cv2.resize(self.color_image, (416, 416))
                     image_data = image_data / 255.
                     image_data = image_data[np.newaxis, ...].astype(np.float32)
-                    self.interpreter.set_tensor(self.input_details[0]['index'], image_data)
+                    self.interpreter.set_tensor(
+                        self.input_details[0]['index'], image_data)
                     self.interpreter.invoke()
-                    pred = [self.interpreter.get_tensor(self.output_details[i]['index']) for i in range(len(self.output_details))]
-                    boxes, pred_conf = self.filter_boxes(pred[0], pred[1], score_threshold=self.detect, input_shape=constant([416, 416]))
+                    pred = [self.interpreter.get_tensor(
+                        self.output_details[i]['index']) for i in range(len(self.output_details))]
+                    boxes, pred_conf = self.filter_boxes(
+                        pred[0], pred[1], score_threshold=self.detect, input_shape=constant([416, 416]))
 
                     boxes, scores, classes, valid_detections = image.combined_non_max_suppression(
                         boxes=reshape(boxes, (shape(boxes)[0], -1, 1, 4)),
@@ -516,47 +540,61 @@ class Camera(QThread):
                         iou_threshold=(iou_threshold/100),
                         score_threshold=self.detect
                     )
-                    pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
+                    pred_bbox = [boxes.numpy(), scores.numpy(
+                    ), classes.numpy(), valid_detections.numpy()]
                     if(self.segment_flag == False):
-                        detected_image,detected_depth_image = self.draw_bbox(self.color_image,colorized_depth, pred_bbox)
+                        detected_image, detected_depth_image = self.draw_bbox(
+                            self.color_image, colorized_depth, pred_bbox)
                         if(depthFlag):
-                            detected_image[0:detected_depth_image.shape[0],0:detected_depth_image.shape[1],:] = detected_depth_image
+                            detected_image[0:detected_depth_image.shape[0],
+                                           0:detected_depth_image.shape[1], :] = detected_depth_image
                         if(record):
-                            temp = cv2.cvtColor(detected_image,cv2.COLOR_RGB2BGR)
+                            temp = cv2.cvtColor(
+                                detected_image, cv2.COLOR_RGB2BGR)
                             out.write(temp)
-                        imagetoQTformat = QImage(detected_image.data,detected_image.shape[1],detected_image.shape[0],QImage.Format_RGB888)
+                        imagetoQTformat = QImage(
+                            detected_image.data, detected_image.shape[1], detected_image.shape[0], QImage.Format_RGB888)
                         self.img_signal.emit(imagetoQTformat)
                     else:
-                        segmented_image,contours = self.segment(self.color_image,pred_bbox)
+                        segmented_image, contours = self.segment(
+                            self.color_image, pred_bbox)
                         if(self.bos_flag):
                             bos = self.draw_bos(contours)
                             if(record):
-                                temp = cv2.cvtColor(bos,cv2.COLOR_RGB2BGR)
+                                temp = cv2.cvtColor(bos, cv2.COLOR_RGB2BGR)
                                 out.write(temp)
-                            imagetoQTformat = QImage(bos.data,bos.shape[1],bos.shape[0],QImage.Format_RGB888)
+                            imagetoQTformat = QImage(
+                                bos.data, bos.shape[1], bos.shape[0], QImage.Format_RGB888)
                             self.img_signal.emit(imagetoQTformat)
                         else:
                             if(record):
-                                temp = cv2.cvtColor(segmented_image,cv2.COLOR_RGB2BGR)
+                                temp = cv2.cvtColor(
+                                    segmented_image, cv2.COLOR_RGB2BGR)
                                 out.write(temp)
-                            imagetoQTformat = QImage(segmented_image.data,segmented_image.shape[1],segmented_image.shape[0],QImage.Format_RGB888)
+                            imagetoQTformat = QImage(
+                                segmented_image.data, segmented_image.shape[1], segmented_image.shape[0], QImage.Format_RGB888)
                             self.img_signal.emit(imagetoQTformat)
                 else:
                     if(depthFlag):
-                        self.color_image[0:colorized_depth.shape[0],0:colorized_depth.shape[1],:] = colorized_depth
+                        self.color_image[0:colorized_depth.shape[0],
+                                         0:colorized_depth.shape[1], :] = colorized_depth
                     if(record):
-                        temp = cv2.cvtColor(self.color_image,cv2.COLOR_RGB2BGR)
+                        temp = cv2.cvtColor(
+                            self.color_image, cv2.COLOR_RGB2BGR)
                         out.write(temp)
-                    converttoQTformat = QImage(self.color_image.data,self.color_image.shape[1],self.color_image.shape[0],QImage.Format_RGB888)
+                    converttoQTformat = QImage(
+                        self.color_image.data, self.color_image.shape[1], self.color_image.shape[0], QImage.Format_RGB888)
                     self.img_signal.emit(converttoQTformat)
 
-    def draw_bbox(self,col, depth, bboxes, classes={0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'}):
+    def draw_bbox(self, col, depth, bboxes, classes={0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'}):
         num_classes = len(classes)
         image_h, image_w, _ = col.shape
-        depth_h,depth_w,_ = depth.shape
-        hsv_tuples = [(1.0 * x / num_classes, 1., 1.) for x in range(num_classes)]
+        depth_h, depth_w, _ = depth.shape
+        hsv_tuples = [(1.0 * x / num_classes, 1., 1.)
+                      for x in range(num_classes)]
         colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-        colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
+        colors = list(
+            map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
 
         random.seed(20)
         random.shuffle(colors)
@@ -564,7 +602,8 @@ class Camera(QThread):
 
         out_boxes, out_scores, out_classes, num_boxes = bboxes
         for i in range(num_boxes[0]):
-            if int(out_classes[0][i]) < 0 or int(out_classes[0][i]) > num_classes: continue
+            if int(out_classes[0][i]) < 0 or int(out_classes[0][i]) > num_classes:
+                continue
             coor = out_boxes[0][i]
             im_coor = np.copy(coor)
             depth_coor = np.copy(coor)
@@ -584,19 +623,24 @@ class Camera(QThread):
             bbox_thick = int(0.6 * (image_h + image_w) / 600)
             if (classes[class_ind] == 'RF' or classes[class_ind] == 'LF'):
                 c1, c2 = (im_coor[1], im_coor[0]), (im_coor[3], im_coor[2])
-                depth_c1, depth_c2 = (depth_coor[1], depth_coor[0]), (depth_coor[3], depth_coor[2])
-                cv2.rectangle(col, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), bbox_color, bbox_thick)
-                cv2.rectangle(depth, (int(depth_c1[0]), int(depth_c1[1])), (int(depth_c2[0]), int(depth_c2[1])), bbox_color, bbox_thick)
+                depth_c1, depth_c2 = (
+                    depth_coor[1], depth_coor[0]), (depth_coor[3], depth_coor[2])
+                cv2.rectangle(col, (int(c1[0]), int(c1[1])), (int(
+                    c2[0]), int(c2[1])), bbox_color, bbox_thick)
+                cv2.rectangle(depth, (int(depth_c1[0]), int(depth_c1[1])), (int(
+                    depth_c2[0]), int(depth_c2[1])), bbox_color, bbox_thick)
 
-        return col,depth
+        return col, depth
 
-    def filter_boxes(self,box_xywh, scores, score_threshold=0.4, input_shape = constant([416,416])):
+    def filter_boxes(self, box_xywh, scores, score_threshold=0.4, input_shape=constant([416, 416])):
         scores_max = math.reduce_max(scores, axis=-1)
         mask = scores_max >= score_threshold
         class_boxes = boolean_mask(box_xywh, mask)
         pred_conf = boolean_mask(scores, mask)
-        class_boxes = reshape(class_boxes, [shape(scores)[0], -1, shape(class_boxes)[-1]])
-        pred_conf = reshape(pred_conf, [shape(scores)[0], -1, shape(pred_conf)[-1]])
+        class_boxes = reshape(
+            class_boxes, [shape(scores)[0], -1, shape(class_boxes)[-1]])
+        pred_conf = reshape(
+            pred_conf, [shape(scores)[0], -1, shape(pred_conf)[-1]])
 
         box_xy, box_wh = split(class_boxes, (2, 2), axis=-1)
 
@@ -615,29 +659,31 @@ class Camera(QThread):
         ], axis=-1)
         return (boxes, pred_conf)
 
-    def segment(self,color_image,bboxes, classes={0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'},image_h = 480,image_w = 848):
+    def segment(self, color_image, bboxes, classes={0: 'RF', 1: 'LF', 2: 'RA', 3: 'LA', 4: 'RT', 5: 'LT'}, image_h=480, image_w=848):
         global contour_settings
         global opening_kernel_size
         global gaussian_blur
         num_classes = len(classes)
-        white_im = np.full((480, 848, 3),255, dtype = np.uint8)
+        white_im = np.full((480, 848, 3), 255, dtype=np.uint8)
         hsv_image = cv2.cvtColor(self.color_image, cv2.COLOR_RGB2HSV)
         lower = np.array([lowerHue, lowerSat, lowerVal])
         upper = np.array([upperHue, upperSat, upperVal])
         mask = cv2.inRange(hsv_image, lower, upper)
         result = cv2.bitwise_and(color_image, color_image, mask=mask)
-        blur = cv2.GaussianBlur(result,(gaussian_blur,gaussian_blur),0)
+        blur = cv2.GaussianBlur(result, (gaussian_blur, gaussian_blur), 0)
         toBeGrayed = np.copy(blur)
         if(self.Regular_flag):
-            toBeGrayed = np.copy(self.color_image)        
+            toBeGrayed = np.copy(self.color_image)
         gray_image = cv2.cvtColor(toBeGrayed, cv2.COLOR_RGB2GRAY)
-        ret3,thresh = cv2.threshold(gray_image,70,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        ret3, thresh = cv2.threshold(
+            gray_image, 70, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         if (self.HSV_flag):
             thresh = 255 - thresh
-        dilate = cv2.dilate(thresh,None, iterations=1)
+        dilate = cv2.dilate(thresh, None, iterations=1)
         out_boxes, out_scores, out_classes, num_boxes = bboxes
         for i in range(num_boxes[0]):
-            if int(out_classes[0][i]) < 0 or int(out_classes[0][i]) > num_classes: continue
+            if int(out_classes[0][i]) < 0 or int(out_classes[0][i]) > num_classes:
+                continue
             coor = out_boxes[0][i]
             coor[0] = int(coor[0] * image_h)
             coor[2] = int(coor[2] * image_h)
@@ -645,24 +691,29 @@ class Camera(QThread):
             coor[3] = int(coor[3] * image_w)
             class_ind = int(out_classes[0][i])
             if (classes[class_ind] == 'RF' or classes[class_ind] == 'LF'):
-                c1, c2 = (int(coor[1]), int(coor[0])), (int(coor[3]), int(coor[2]))
-                white_im[c1[1]:c2[1],c1[0]:c2[0],0] = dilate[c1[1]:c2[1],c1[0]:c2[0]]
-        
-        kernel = np.ones((opening_kernel_size,opening_kernel_size),np.uint8)
-        open = cv2.morphologyEx(white_im[:,:,0], cv2.MORPH_OPEN, kernel)
-        contours, hierarchy = cv2.findContours(image=(255-open), mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
+                c1, c2 = (int(coor[1]), int(coor[0])
+                          ), (int(coor[3]), int(coor[2]))
+                white_im[c1[1]:c2[1], c1[0]:c2[0],
+                         0] = dilate[c1[1]:c2[1], c1[0]:c2[0]]
+
+        kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
+        open = cv2.morphologyEx(white_im[:, :, 0], cv2.MORPH_OPEN, kernel)
+        contours, hierarchy = cv2.findContours(
+            image=(255-open), mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
         final_contours = []
         for contour in contours:
-            if(cv2.contourArea(contour)<contour_settings):
+            if(cv2.contourArea(contour) < contour_settings):
                 continue
             else:
                 final_contours.append(contour)
-        cv2.drawContours(image=white_im, contours=final_contours, contourIdx=-1, color=(0,0,0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.drawContours(image=white_im, contours=final_contours,
+                         contourIdx=-1, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         self.main_win.statusBar.clearMessage()
-        self.main_win.statusBar.showMessage(f"No.of contours detected:{len(final_contours)}, proceed if contours are drawn only on feet")
-        return white_im,final_contours
+        self.main_win.statusBar.showMessage(
+            f"No.of contours detected:{len(final_contours)}, proceed if contours are drawn only on feet")
+        return white_im, final_contours
 
-    def draw_bos(self,contours):
+    def draw_bos(self, contours):
         global sock
         global UDP_IP
         global UDP_PORT
@@ -673,8 +724,8 @@ class Camera(QThread):
         message = "null"
         if(len(contours) == 1):
             bos = np.vstack(contours[0]).squeeze()
-            cv2.fillPoly(mask,[bos],color = col)
-            bos_img = cv2.addWeighted(mask, 0.4,self.color_image,0.6, 0)
+            cv2.fillPoly(mask, [bos], color=col)
+            bos_img = cv2.addWeighted(mask, 0.7, self.color_image, 0.3, 0)
             message = "narrow"
             self.main_win.statusBar.clearMessage()
             self.main_win.statusBar.showMessage(f"BOS TYPE: {message}")
@@ -689,49 +740,55 @@ class Camera(QThread):
                     self.main_win.statusBar.clearMessage()
                     self.main_win.statusBar.showMessage(f"Numpy ndim error")
                     continue
-                y_min_index = np.argmin(cnt[:,1])
-                xy_minimum = tuple(cnt[y_min_index,:])
+                y_min_index = np.argmin(cnt[:, 1])
+                xy_minimum = tuple(cnt[y_min_index, :])
                 area_points.append(xy_minimum)
                 # print(xy_minimum)
-                y_max_index = np.argmax(cnt[:,1])
-                xy_maximum = tuple(cnt[y_max_index,:])
+                y_max_index = np.argmax(cnt[:, 1])
+                xy_maximum = tuple(cnt[y_max_index, :])
                 area_points.append(xy_maximum)
                 # print(xy_max)
-                (x,y),radius = cv2.minEnclosingCircle(cnt)
-                center = (int(x),int(y))
-                final_metrics.append(dict({'center':center , 'xy_min':xy_minimum, 'xy_min_idx':y_min_index, 'xy_max':xy_maximum, 'xy_max_idx':y_max_index, 'points':cnt}))
+                (x, y), radius = cv2.minEnclosingCircle(cnt)
+                center = (int(x), int(y))
+                final_metrics.append(dict({'center': center, 'xy_min': xy_minimum, 'xy_min_idx': y_min_index,
+                                     'xy_max': xy_maximum, 'xy_max_idx': y_max_index, 'points': cnt}))
             # print(area_points)
             area = abs((area_points[0][0]*area_points[1][1] - area_points[0][1]*area_points[1][0])
-                        +(area_points[1][0]*area_points[3][1] - area_points[1][1]*area_points[3][0])
-                        +(area_points[3][0]*area_points[2][1] - area_points[3][1]*area_points[2][0])
-                        +(area_points[2][0]*area_points[0][1] - area_points[2][1]*area_points[0][0])) / 2
+                       + (area_points[1][0]*area_points[3][1] -
+                          area_points[1][1]*area_points[3][0])
+                       + (area_points[3][0]*area_points[2][1] -
+                           area_points[3][1]*area_points[2][0])
+                       + (area_points[2][0]*area_points[0][1] - area_points[2][1]*area_points[0][0])) / 2
             if(area >= 9100):
                 message = "wide"
             else:
                 message = "narrow"
             if(self.send_flag):
                 sock.sendto((message).encode(), (UDP_IP, UDP_PORT))
-            
-            if(final_metrics[0]['center'][0]<final_metrics[1]['center'][0]):
+
+            if(final_metrics[0]['center'][0] < final_metrics[1]['center'][0]):
                 left = final_metrics[0]
                 right = final_metrics[1]
             else:
                 left = final_metrics[1]
                 right = final_metrics[0]
 
-            left_points = left['points'][left['xy_min_idx']:left['xy_max_idx']+1]
+            left_points = left['points'][left['xy_min_idx']
+                :left['xy_max_idx']+1]
             right_points = right['points'][right['xy_max_idx']:]
-            right_points = np.concatenate([right_points, right['points'][0:right['xy_min_idx']]])
-            bos = np.concatenate([left_points,right_points])
-            cv2.fillPoly(mask,[bos],color = col)
-            bos_img = cv2.addWeighted(mask, 0.4,self.color_image,0.6, 0)
+            right_points = np.concatenate(
+                [right_points, right['points'][0:right['xy_min_idx']]])
+            bos = np.concatenate([left_points, right_points])
+            cv2.fillPoly(mask, [bos], color=col)
+            bos_img = cv2.addWeighted(mask, 0.7, self.color_image, 0.3, 0)
             self.main_win.statusBar.clearMessage()
             self.main_win.statusBar.showMessage(f"BOS TYPE: {message}")
             return(bos_img)
 
         else:
             self.main_win.statusBar.clearMessage()
-            self.main_win.statusBar.showMessage(f"No BOS! No contours or more than 2 contours detected, repeat segmentation, BOS TYPE:{message}")
+            self.main_win.statusBar.showMessage(
+                f"No BOS! No contours or more than 2 contours detected, repeat segmentation, BOS TYPE:{message}")
             if(self.send_flag):
                 sock.sendto((message).encode(), (UDP_IP, UDP_PORT))
             return(mask)
@@ -742,10 +799,8 @@ class Camera(QThread):
         self.quit()
 
 
-
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_win = mainWindow()
     main_win.show()
     sys.exit(app.exec_())
-
